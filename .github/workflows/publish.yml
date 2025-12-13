@@ -44,12 +44,12 @@ jobs:
         run: npm run compile
 
       - name: Package (vsix)
-        run: npx --yes @vscode/vsce package --no-dependencies
+        run: npx --yes @vscode/vsce package
 
       - name: Publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx --yes @vscode/vsce publish --no-dependencies -p "$VSCE_PAT"
+        run: npx --yes @vscode/vsce publish -p "$VSCE_PAT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

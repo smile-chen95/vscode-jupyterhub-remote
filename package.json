@@ -4,7 +4,7 @@
     "description": "连接远程 JupyterHub 服务，提供文件浏览、终端和内核管理功能",
     "publisher": "smile-chen95",
     "icon": "resources/jupyter-logo.png",
-    "version": "0.1.0",
+    "version": "0.2.2",
     "license": "Apache-2.0",
     "homepage": "https://github.com/smile-chen95/vscode-jupyterhub-remote#readme",
     "bugs": {
@@ -24,7 +24,27 @@
     ],
     "activationEvents": [
         "onView:jupyterhubServers",
-        "onCommand:jupyterhub.connectServer"
+        "onView:jupyterhubFiles",
+        "onView:jupyterhubKernels",
+        "onCommand:jupyterhub.connectServer",
+        "onCommand:jupyterhub.disconnectServer",
+        "onCommand:jupyterhub.reconfigureServer",
+        "onCommand:jupyterhub.refreshFiles",
+        "onCommand:jupyterhub.createFile",
+        "onCommand:jupyterhub.createFolder",
+        "onCommand:jupyterhub.deleteItem",
+        "onCommand:jupyterhub.renameItem",
+        "onCommand:jupyterhub.downloadFile",
+        "onCommand:jupyterhub.uploadFile",
+        "onCommand:jupyterhub.openFile",
+        "onCommand:jupyterhub.openTerminal",
+        "onCommand:jupyterhub.showKernels",
+        "onCommand:jupyterhub.refreshKernels",
+        "onCommand:jupyterhub.stopKernel",
+        "onCommand:jupyterhub.restartKernel",
+        "onCommand:jupyterhub.interruptKernel",
+        "onCommand:jupyterhub.deleteTerminal",
+        "onCommand:jupyterhub.showMetricsDetails"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -130,6 +150,11 @@
                 "title": "刷新",
                 "category": "JupyterHub",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "jupyterhub.showMetricsDetails",
+                "title": "JupyterHub: 显示资源监控详情",
+                "category": "JupyterHub"
             }
         ],
         "viewsContainers": {

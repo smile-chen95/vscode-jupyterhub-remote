@@ -1,0 +1,16 @@
+.vscode/**
+.github/**
+src/**
+**/*.ts
+**/*.map
+**/*.test.*
+out/test/**
+node_modules/**
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.vsix
+/jupyterhub-remote-extension-*.vsix
+docs/**
+build.sh

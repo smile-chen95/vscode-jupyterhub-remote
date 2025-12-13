@@ -1,0 +1,366 @@
+{
+    "name": "jupyterhub-remote-extension",
+    "displayName": "JupyterHub Remote",
+    "description": "连接远程 JupyterHub 服务，提供文件浏览、终端和内核管理功能",
+    "publisher": "smile-chen95",
+    "icon": "resources/jupyter-logo.png",
+    "version": "0.1.0",
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/smile-chen95/vscode-jupyterhub-remote#readme",
+    "bugs": {
+        "url": "https://github.com/smile-chen95/vscode-jupyterhub-remote/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/smile-chen95/vscode-jupyterhub-remote.git"
+    },
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onView:jupyterhubServers",
+        "onCommand:jupyterhub.connectServer"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "jupyterhub.connectServer",
+                "title": "JupyterHub: 连接到 JupyterHub 服务器",
+                "category": "JupyterHub",
+                "icon": "$(plug)"
+            },
+            {
+                "command": "jupyterhub.disconnectServer",
+                "title": "JupyterHub: 断开服务器连接",
+                "category": "JupyterHub",
+                "icon": "$(debug-disconnect)"
+            },
+            {
+                "command": "jupyterhub.reconfigureServer",
+                "title": "JupyterHub: 重新配置服务器",
+                "category": "JupyterHub",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "jupyterhub.refreshFiles",
+                "title": "刷新文件列表",
+                "category": "JupyterHub",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "jupyterhub.createFile",
+                "title": "新建文件",
+                "category": "JupyterHub",
+                "icon": "$(new-file)"
+            },
+            {
+                "command": "jupyterhub.createFolder",
+                "title": "新建文件夹",
+                "category": "JupyterHub",
+                "icon": "$(new-folder)"
+            },
+            {
+                "command": "jupyterhub.deleteItem",
+                "title": "删除",
+                "category": "JupyterHub",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "jupyterhub.renameItem",
+                "title": "重命名",
+                "category": "JupyterHub"
+            },
+            {
+                "command": "jupyterhub.downloadFile",
+                "title": "下载文件",
+                "category": "JupyterHub"
+            },
+            {
+                "command": "jupyterhub.uploadFile",
+                "title": "上传文件",
+                "category": "JupyterHub",
+                "icon": "$(cloud-upload)"
+            },
+            {
+                "command": "jupyterhub.openFile",
+                "title": "打开文件",
+                "category": "JupyterHub"
+            },
+            {
+                "command": "jupyterhub.openTerminal",
+                "title": "打开远程终端",
+                "category": "JupyterHub",
+                "icon": "$(terminal)"
+            },
+            {
+                "command": "jupyterhub.showKernels",
+                "title": "显示内核管理面板",
+                "category": "JupyterHub",
+                "icon": "$(server-process)"
+            },
+            {
+                "command": "jupyterhub.stopKernel",
+                "title": "停止内核",
+                "category": "JupyterHub"
+            },
+            {
+                "command": "jupyterhub.restartKernel",
+                "title": "重启内核",
+                "category": "JupyterHub"
+            },
+            {
+                "command": "jupyterhub.interruptKernel",
+                "title": "中断内核",
+                "category": "JupyterHub"
+            },
+            {
+                "command": "jupyterhub.deleteTerminal",
+                "title": "关闭终端",
+                "category": "JupyterHub",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "jupyterhub.refreshKernels",
+                "title": "刷新",
+                "category": "JupyterHub",
+                "icon": "$(refresh)"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "jupyterhub-remote",
+                    "title": "JupyterHub Remote",
+                    "icon": "resources/jupyter-icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "jupyterhub-remote": [
+                {
+                    "id": "jupyterhubServers",
+                    "name": "服务器连接",
+                    "icon": "resources/jupyter-icon.svg"
+                },
+                {
+                    "id": "jupyterhubFiles",
+                    "name": "文件浏览器",
+                    "icon": "resources/folder-icon.svg"
+                },
+                {
+                    "id": "jupyterhubKernels",
+                    "name": "内核管理",
+                    "icon": "resources/kernel-icon.svg"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "jupyterhub.refreshFiles",
+                    "when": "view == jupyterhubFiles",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.createFile",
+                    "when": "view == jupyterhubFiles",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.createFolder",
+                    "when": "view == jupyterhubFiles",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.uploadFile",
+                    "when": "view == jupyterhubFiles",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.openTerminal",
+                    "when": "view == jupyterhubFiles",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.connectServer",
+                    "when": "view == jupyterhubServers && !jupyterhub.connected",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.disconnectServer",
+                    "when": "view == jupyterhubServers && jupyterhub.connected",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.reconfigureServer",
+                    "when": "view == jupyterhubServers && jupyterhub.connected",
+                    "group": "navigation"
+                },
+                {
+                    "command": "jupyterhub.refreshKernels",
+                    "when": "view == jupyterhubKernels",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "jupyterhub.connectServer",
+                    "when": "view == jupyterhubServers && viewItem == disconnected",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.openTerminal",
+                    "when": "view == jupyterhubServers && viewItem == connectedServer",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.reconfigureServer",
+                    "when": "view == jupyterhubServers && viewItem == connectedServer",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.disconnectServer",
+                    "when": "view == jupyterhubServers && viewItem == connectedServer",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.refreshKernels",
+                    "when": "view == jupyterhubKernels && viewItem == category",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.renameItem",
+                    "when": "view == jupyterhubFiles"
+                },
+                {
+                    "command": "jupyterhub.deleteItem",
+                    "when": "view == jupyterhubFiles"
+                },
+                {
+                    "command": "jupyterhub.downloadFile",
+                    "when": "view == jupyterhubFiles && viewItem == file"
+                },
+                {
+                    "command": "jupyterhub.stopKernel",
+                    "when": "view == jupyterhubKernels && (viewItem == kernel || viewItem == session)",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.restartKernel",
+                    "when": "view == jupyterhubKernels && (viewItem == kernel || viewItem == session)",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.interruptKernel",
+                    "when": "view == jupyterhubKernels && (viewItem == kernel || viewItem == session)"
+                },
+                {
+                    "command": "jupyterhub.deleteTerminal",
+                    "when": "view == jupyterhubKernels && viewItem == terminal",
+                    "group": "inline"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "JupyterHub Remote",
+            "properties": {
+                "jupyterhub.serverUrl": {
+                    "type": "string",
+                    "default": "",
+                    "description": "JupyterHub 服务器 URL（例如：https://hub.example.com）"
+                },
+                "jupyterhub.verifySSL": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "是否验证 SSL 证书"
+                },
+                "jupyterhub.maxRetries": {
+                    "type": "number",
+                    "default": 3,
+                    "description": "连接失败时的最大重试次数"
+                },
+                "jupyterhub.debug": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "开启调试日志（Extension Host 控制台输出详细连接/请求日志）"
+                },
+                "jupyterhub.autoStartServer": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "连接时若用户服务器未运行，是否自动启动默认 Server"
+                },
+                "jupyterhub.profileByServer": {
+                    "type": "object",
+                    "default": {},
+                    "description": "按服务器 URL 记录默认 profile（用于 REST 启动传参）。键为 Hub URL，值为 profile key。",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "jupyterhub.userOptionsByServer": {
+                    "type": "object",
+                    "default": {},
+                    "description": "按服务器 URL 记录 REST 启动时透传的 user_options。键为 Hub URL，值为一个对象，将与 profile 合并后发送给 /hub/api/users/{user}/server。",
+                    "additionalProperties": {
+                        "type": "object"
+                    }
+                },
+                "jupyterhub.recentServers": {
+                    "type": "array",
+                    "default": [],
+                    "description": "最近连接的服务器列表",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "jupyterhub.refreshInterval.files": {
+                    "type": "number",
+                    "default": 10,
+                    "description": "文件列表的自动刷新间隔（秒）。0 表示禁用。"
+                },
+                "jupyterhub.refreshInterval.kernels": {
+                    "type": "number",
+                    "default": 10,
+                    "description": "内核和终端列表的自动刷新间隔（秒）。0 表示禁用。"
+                },
+                "jupyterhub.refreshInterval.metrics": {
+                    "type": "number",
+                    "default": 5,
+                    "description": "底部状态栏资源监控（CPU/内存）的刷新间隔（秒）。0 表示禁用。"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "node ./node_modules/typescript/bin/tsc -p ./",
+        "watch": "node ./node_modules/typescript/bin/tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "node ./node_modules/eslint/bin/eslint.js src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/glob": "^8.1.0",
+        "@types/mocha": "^10.0.6",
+        "@types/node": "18.x",
+        "@types/vscode": "^1.85.0",
+        "@types/ws": "^8.18.1",
+        "@typescript-eslint/eslint-plugin": "^6.15.0",
+        "@typescript-eslint/parser": "^6.15.0",
+        "@vscode/test-electron": "^2.3.8",
+        "eslint": "^8.56.0",
+        "glob": "^10.3.10",
+        "mocha": "^10.2.0",
+        "typescript": "^5.3.3"
+    },
+    "dependencies": {
+        "@types/uuid": "^10.0.0",
+        "axios": "^1.6.2",
+        "uuid": "^13.0.0",
+        "ws": "^8.18.3"
+    }
+}

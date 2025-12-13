@@ -20,6 +20,15 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Sync version from tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Tag: ${GITHUB_REF_NAME}"
+          echo "Version: ${VERSION}"
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+
       - name: Install
         run: npm ci
 
@@ -38,4 +47,3 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: "*.vsix"
-

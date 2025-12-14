@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" style="background:#0f172a;font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;">
+  <style>
+    .title { fill: #e2e8f0; font-size: 32px; font-weight: 700; }
+    .subtitle { fill: #cbd5e1; font-size: 20px; }
+    .item { fill: #f8fafc; font-size: 18px; }
+    .bullet { fill: none; stroke: #38bdf8; stroke-width: 3; }
+  </style>
+  <text x="60" y="80" class="title">JupyterHub Remote Extension</text>
+  <text x="60" y="120" class="subtitle">浏览文件 / 终端 / 资源监控</text>
+  <rect x="50" y="150" width="5" height="5" class="bullet" />
+  <text x="80" y="165" class="item">命令面板输入 JupyterHub 连接命令</text>
+  <rect x="50" y="210" width="5" height="5" class="bullet" />
+  <text x="80" y="225" class="item">保存多个服务器配置，随时切换</text>
+  <rect x="50" y="270" width="5" height="5" class="bullet" />
+  <text x="80" y="285" class="item">自动启动单用户服务器并展示 CPU / 内存 / 磁盘</text>
+  <rect x="40" y="320" width="880" height="170" rx="12" ry="12" fill="#111827" stroke="#334155" />
+  <text x="60" y="360" class="item" fill="#e5e7eb">连接成功后可在资源监控中看到 CPU / 内存 / 磁盘指标，以及远程文件与终端。</text>
+</svg>

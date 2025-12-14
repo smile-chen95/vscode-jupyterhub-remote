@@ -15,6 +15,13 @@ export interface CpuLimit {
 export interface Limits {
     memory?: ResourceLimit;
     cpu?: CpuLimit;
+    disk?: DiskUsage;
+}
+
+export interface DiskUsage {
+    used: number;
+    total?: number;
+    warn?: boolean;
 }
 
 export interface MetricsData {
@@ -23,6 +30,7 @@ export interface MetricsData {
     cpu_percent: number;
     cpu_count: number;
     limits: Limits;
+    disk?: DiskUsage;
 }
 
 export class MetricsApi {

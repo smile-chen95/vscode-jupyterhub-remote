@@ -97,9 +97,18 @@ export class MetricsManager {
         }
 
         const cpu = data.cpu_percent.toFixed(1);
+        const cpuText = data.cpu_count ? `${cpu}% / ${data.cpu_count}c` : `${cpu}%`;
+
+        let diskText = 'N/A';
+        if (data.disk) {
+            const diskUsed = formatSize(data.disk.used);
+            diskText = data.disk.total ? `${diskUsed} / ${formatSize(data.disk.total)}` : diskUsed;
+        }
+
+        const memText = `${memUsed}${memLimitStr}`;
 
         // 状态栏文本
-        this.statusBarItem.text = `$(pulse) CPU: ${cpu}%  $(server) Mem: ${memUsed}${memLimitStr}`;
+        this.statusBarItem.text = `$(pulse) CPU: ${cpuText}  $(server) Mem: ${memText}  $(database) Disk: ${diskText}`;
 
         // 悬停提示
         const tooltip = new vscode.MarkdownString();
@@ -117,10 +126,19 @@ export class MetricsManager {
             tooltip.appendMarkdown(`- **内存限制 (PSS)**: ${formatSize(data.limits.memory.pss)}\n`);
         }
 
+        if (data.disk) {
+            tooltip.appendMarkdown(`- **磁盘使用**: ${formatSize(data.disk.used)}`);
+            if (data.disk.total) {
+                tooltip.appendMarkdown(` / ${formatSize(data.disk.total)}`);
+            }
+            tooltip.appendMarkdown(`\n`);
+        }
+
         this.statusBarItem.tooltip = tooltip;
 
         // 告警颜色
-        if (data.limits?.memory?.warn || data.limits?.cpu?.warn) {
+        const hasWarn = data.limits?.memory?.warn || data.limits?.cpu?.warn || data.limits?.disk?.warn || data.disk?.warn;
+        if (hasWarn) {
             this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
         } else {
             this.statusBarItem.backgroundColor = undefined;

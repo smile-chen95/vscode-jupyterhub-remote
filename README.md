@@ -1,16 +1,21 @@
 # JupyterHub Remote Extension
 
 VS Code 扩展：连接远程 JupyterHub / Jupyter Server，在 VS Code 中浏览与编辑远程文件、管理终端与内核，并展示资源监控。
-使用Jupyterhub REST API，用于无法开启SSH或者生产无法暴露SSH等场景
+使用Jupyterhub REST API
 
 ## 功能
 
 - 连接 JupyterHub（API Token 认证），支持自动/手动启动单用户服务器
+- 支持保存多服务器（最近连接列表），可随时切换/重新配置
 - 远程文件浏览与常用文件操作（新建/删除/重命名/上传/下载）
 - 远程终端（Jupyter Server terminals WebSocket）
 - 内核/会话管理（查看、停止、重启、中断）
-- 状态栏资源监控（依赖服务器侧 `/api/metrics/v1` 插件）
+- 状态栏资源监控（CPU/内存/磁盘；依赖服务器侧 `/api/metrics/v1` 插件）
 - 支持按 Hub URL 透传 `user_options`（profile/资源参数）
+
+## 示例
+
+![](resources/vscode_jupyterhub_remote.png)
 
 ## 兼容性
 
@@ -42,9 +47,26 @@ code --install-extension jupyterhub-remote-extension-*.vsix
 
 ## 使用
 
-1. 打开命令面板（`Cmd/Ctrl+Shift+P`），运行 `JupyterHub: 连接到 JupyterHub 服务器`
-2. 输入 Hub URL 与 API Token（Token 存在 VS Code Secret Storage）
-3. 若服务器未运行且启用自动启动，会按配置透传 options 启动
+1. 打开命令面板：
+   - macOS：`Cmd+Shift+P`
+   - Windows/Linux：`Ctrl+Shift+P`
+2. 运行 `JupyterHub: 连接到 JupyterHub 服务器`
+3. 输入 Hub URL 与 API Token（Token 存在 VS Code Secret Storage）
+4. 若服务器未运行且启用自动启动，会按配置透传 options 启动
+
+### 常用命令
+
+- `JupyterHub: 连接到 JupyterHub 服务器`：新增/切换到某个 Hub
+- `JupyterHub: 断开服务器连接`：断开当前连接
+- `JupyterHub: 重新配置服务器`：修改当前 Hub 的 URL/Token 等
+- `JupyterHub: 显示内核管理面板`：查看/停止/重启/中断内核
+- 点击底部状态栏的资源监控项，可打开详情（CPU/内存/磁盘）
+
+### 资源监控前置条件
+
+需要在服务器侧安装并启用 `jupyter-resource-usage`，扩展会通过 `/api/metrics/v1` 拉取指标：
+
+- https://github.com/jupyter-server/jupyter-resource-usage
 
 ### Profile / user_options 配置
 

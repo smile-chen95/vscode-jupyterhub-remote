@@ -12,9 +12,15 @@ export interface CpuLimit {
     warn: boolean;
 }
 
+export interface DiskLimit {
+    disk: number;
+    warn: boolean;
+}
+
 export interface Limits {
     memory?: ResourceLimit;
     cpu?: CpuLimit;
+    disk?: DiskLimit;
 }
 
 export interface MetricsData {
@@ -22,6 +28,8 @@ export interface MetricsData {
     pss: number;
     cpu_percent: number;
     cpu_count: number;
+    disk_used?: number;
+    disk_total?: number;
     limits: Limits;
 }
 

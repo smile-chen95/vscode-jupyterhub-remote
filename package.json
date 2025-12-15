@@ -4,7 +4,7 @@
     "description": "连接远程 JupyterHub 服务，提供文件浏览、终端和内核管理功能",
     "publisher": "smile-chen95",
     "icon": "resources/jupyter-logo.png",
-    "version": "0.2.4",
+    "version": "0.2.5",
     "license": "Apache-2.0",
     "homepage": "https://github.com/smile-chen95/vscode-jupyterhub-remote#readme",
     "bugs": {

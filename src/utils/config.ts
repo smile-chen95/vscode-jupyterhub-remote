@@ -105,6 +105,32 @@ export class ConfigManager {
         return vscode.workspace.getConfiguration(this.CONFIG_SECTION).get<string[]>('recentServers', []);
     }
 
+    static getAllowInsecureTokenStorage(): boolean {
+        return vscode.workspace.getConfiguration(this.CONFIG_SECTION).get<boolean>('allowInsecureTokenStorage', false);
+    }
+
+    static getTokenByServer(): Record<string, string> {
+        return vscode.workspace.getConfiguration(this.CONFIG_SECTION).get<Record<string, string>>('tokenByServer', {});
+    }
+
+    static async setTokenForServer(serverUrl: string, token: string): Promise<void> {
+        if (!serverUrl) return;
+        const config = vscode.workspace.getConfiguration(this.CONFIG_SECTION);
+        const mapping = config.get<Record<string, string>>('tokenByServer', {});
+        mapping[serverUrl] = token;
+        await config.update('tokenByServer', mapping, vscode.ConfigurationTarget.Global);
+    }
+
+    static async deleteTokenForServer(serverUrl: string): Promise<void> {
+        if (!serverUrl) return;
+        const config = vscode.workspace.getConfiguration(this.CONFIG_SECTION);
+        const mapping = config.get<Record<string, string>>('tokenByServer', {});
+        if (mapping && Object.prototype.hasOwnProperty.call(mapping, serverUrl)) {
+            delete mapping[serverUrl];
+            await config.update('tokenByServer', mapping, vscode.ConfigurationTarget.Global);
+        }
+    }
+
     /**
      * 添加到最近连接列表
      */
@@ -123,5 +149,36 @@ export class ConfigManager {
         }
 
         await config.update('recentServers', recent, vscode.ConfigurationTarget.Global);
+    }
+
+    /**
+     * 从最近连接列表移除
+     */
+    static async removeRecentServer(url: string): Promise<void> {
+        if (!url) return;
+        const config = vscode.workspace.getConfiguration(this.CONFIG_SECTION);
+        const recent = config.get<string[]>('recentServers', []).filter(s => s !== url);
+        await config.update('recentServers', recent, vscode.ConfigurationTarget.Global);
+    }
+
+    /**
+     * 删除某个服务器相关的配置（profile/user_options）
+     */
+    static async deleteServerConfigs(serverUrl: string): Promise<void> {
+        if (!serverUrl) return;
+
+        const config = vscode.workspace.getConfiguration(this.CONFIG_SECTION);
+
+        const profileMapping = config.get<Record<string, string>>('profileByServer', {});
+        if (profileMapping && Object.prototype.hasOwnProperty.call(profileMapping, serverUrl)) {
+            delete profileMapping[serverUrl];
+            await config.update('profileByServer', profileMapping, vscode.ConfigurationTarget.Global);
+        }
+
+        const userOptionsMapping = config.get<Record<string, Record<string, any>>>('userOptionsByServer', {});
+        if (userOptionsMapping && Object.prototype.hasOwnProperty.call(userOptionsMapping, serverUrl)) {
+            delete userOptionsMapping[serverUrl];
+            await config.update('userOptionsByServer', userOptionsMapping, vscode.ConfigurationTarget.Global);
+        }
     }
 }

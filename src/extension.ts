@@ -18,6 +18,7 @@ import { ConfigManager } from './utils/config';
 import { Logger } from './utils/logger';
 import { SecretStorageManager } from './utils/secretStorage';
 import { MetricsManager } from './managers/metricsManager';
+import { buildHubTokenPageUrl, normalizeHubBaseUrl } from './utils/url';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -65,6 +66,58 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
             }
         );
     });
+}
+
+function getTokenFromSettings(url: string): string | undefined {
+    const mapping = ConfigManager.getTokenByServer();
+    return mapping?.[url];
+}
+
+async function hasTokenForHub(url: string): Promise<boolean> {
+    if (ConfigManager.getAllowInsecureTokenStorage()) {
+        return !!getTokenFromSettings(url);
+    }
+    return await secretStorageManager.hasToken(url);
+}
+
+async function getTokenForHub(url: string): Promise<string | undefined> {
+    if (ConfigManager.getAllowInsecureTokenStorage()) {
+        const t = getTokenFromSettings(url);
+        if (t) return t;
+    }
+    return await secretStorageManager.getToken(url);
+}
+
+async function saveTokenForHub(url: string, token: string): Promise<void> {
+    if (ConfigManager.getAllowInsecureTokenStorage()) {
+        await ConfigManager.setTokenForServer(url, token);
+        return;
+    }
+    await secretStorageManager.saveToken(token, url);
+}
+
+async function deleteTokenForHub(url: string): Promise<void> {
+    await secretStorageManager.deleteToken(url);
+    await ConfigManager.deleteTokenForServer(url);
+}
+
+async function migrateTokenKeyIfNeeded(fromUrl: string, toUrl: string): Promise<void> {
+    if (!fromUrl || !toUrl || fromUrl === toUrl) {
+        return;
+    }
+
+    const existingTo = await getTokenForHub(toUrl);
+    if (existingTo) {
+        return;
+    }
+
+    const fromToken = await getTokenForHub(fromUrl);
+    if (!fromToken) {
+        return;
+    }
+
+    await saveTokenForHub(toUrl, fromToken);
+    await deleteTokenForHub(fromUrl);
 }
 
 /**
@@ -171,6 +224,9 @@ function registerCommands(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('jupyterhub.reconfigureServer', reconfigureServer)
     );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('jupyterhub.deleteServer', deleteServer)
+    );
 
     // 文件操作命令
     context.subscriptions.push(
@@ -259,18 +315,95 @@ function registerCommands(context: vscode.ExtensionContext) {
     );
 }
 
+async function deleteServer(item?: any) {
+    const savedUrl = ConfigManager.getServerUrl();
+    const recentServers = ConfigManager.getRecentServers();
+
+    let url: string | undefined;
+    if (item && typeof item === 'object' && typeof item.label === 'string' && item.label.startsWith('http')) {
+        url = item.label;
+    }
+
+    if (!url) {
+        const candidates = Array.from(new Set([savedUrl, ...recentServers].filter(Boolean))) as string[];
+        if (candidates.length === 0) {
+            vscode.window.showInformationMessage('没有可删除的服务器记录');
+            return;
+        }
+
+        const picked = await vscode.window.showQuickPick(
+            candidates.map((u) => ({
+                label: u,
+                description: u === savedUrl ? '默认服务器' : '最近访问'
+            })),
+            {
+                placeHolder: '选择要删除的服务器'
+            }
+        );
+
+        if (!picked) return;
+        url = picked.label;
+    }
+
+    url = normalizeHubBaseUrl(url);
+
+    const isCurrentServer = savedUrl ? normalizeHubBaseUrl(savedUrl) === url : false;
+    const isConnected = !!hubApi && isCurrentServer;
+
+    const deleteLabel = isConnected ? '删除并断开' : '删除';
+    const result = await vscode.window.showWarningMessage(
+        `确定删除服务器配置？\n${url}\n将移除最近访问记录，并删除已保存的 Token / profile / user_options。`,
+        { modal: true },
+        deleteLabel,
+        '取消'
+    );
+
+    if (result !== deleteLabel) {
+        return;
+    }
+
+    if (isConnected) {
+        await disconnectServer();
+    }
+
+    const urlsToRemove = Array.from(new Set(
+        [savedUrl, ...recentServers]
+            .filter(Boolean)
+            .filter((u) => u === url || normalizeHubBaseUrl(u as string) === url) as string[]
+    ));
+
+    for (const u of urlsToRemove) {
+        await ConfigManager.removeRecentServer(u);
+        await ConfigManager.deleteServerConfigs(u);
+        await deleteTokenForHub(u);
+    }
+
+    if (isCurrentServer) {
+        await ConfigManager.setServerUrl('');
+    }
+
+    serverProvider.refresh();
+    vscode.window.showInformationMessage(`已删除服务器: ${url}`);
+}
+
 /**
  * 尝试自动连接
  */
 async function tryAutoConnect() {
-    const savedServerUrl = ConfigManager.getServerUrl();
+    const savedServerUrlRaw = ConfigManager.getServerUrl();
+    const savedServerUrl = savedServerUrlRaw ? normalizeHubBaseUrl(savedServerUrlRaw) : savedServerUrlRaw;
+
+    if (savedServerUrlRaw && savedServerUrl && savedServerUrl !== savedServerUrlRaw) {
+        await migrateTokenKeyIfNeeded(savedServerUrlRaw, savedServerUrl);
+        await ConfigManager.setServerUrl(savedServerUrl);
+    }
 
     // 尝试迁移旧 Token
     if (savedServerUrl) {
         await secretStorageManager.tryMigrateLegacyToken(savedServerUrl);
     }
 
-    const hasToken = await secretStorageManager.hasToken(savedServerUrl);
+    const hasToken = savedServerUrl ? await hasTokenForHub(savedServerUrl) : false;
 
     if (hasToken && savedServerUrl) {
         // 静默连接尝试，或者提示
@@ -311,6 +444,16 @@ async function connectServer(arg?: any) {
             targetUrl = undefined;
         }
 
+        if (targetUrl) {
+            const rawTargetUrl = targetUrl;
+            const normalizedTargetUrl = normalizeHubBaseUrl(targetUrl);
+            if (normalizedTargetUrl !== targetUrl) {
+                Logger.log(`[Connect] Normalized targetUrl: ${targetUrl} -> ${normalizedTargetUrl}`);
+                await migrateTokenKeyIfNeeded(rawTargetUrl, normalizedTargetUrl);
+                targetUrl = normalizedTargetUrl;
+            }
+        }
+
         Logger.log(`[Connect] Resolved targetUrl: ${targetUrl}`);
 
         // 2. 获取当前配置并进行从错误中恢复
@@ -319,6 +462,15 @@ async function connectServer(arg?: any) {
             Logger.warn('[Connect] Config corruption detected. Resetting serverUrl.');
             currentConfigUrl = '';
             await ConfigManager.setServerUrl('');
+        }
+
+        if (currentConfigUrl) {
+            const normalizedConfigUrl = normalizeHubBaseUrl(currentConfigUrl);
+            if (normalizedConfigUrl !== currentConfigUrl) {
+                await migrateTokenKeyIfNeeded(currentConfigUrl, normalizedConfigUrl);
+                currentConfigUrl = normalizedConfigUrl;
+                await ConfigManager.setServerUrl(currentConfigUrl);
+            }
         }
 
         // 3. 智能判断
@@ -340,8 +492,9 @@ async function connectServer(arg?: any) {
         }
 
         // 5. 如果还是没有，提示输入
+        let rawUrlForTokenLookup: string | undefined;
         if (!url) {
-            url = await vscode.window.showInputBox({
+            const inputUrl = await vscode.window.showInputBox({
                 prompt: '输入 JupyterHub 服务器 URL',
                 placeHolder: 'https://hub.example.com',
                 validateInput: (value) => {
@@ -353,26 +506,36 @@ async function connectServer(arg?: any) {
                 }
             });
 
-            if (!url) return;
+            if (!inputUrl) return;
+
+            rawUrlForTokenLookup = inputUrl.trim().replace(/\/+$/, '');
+            url = normalizeHubBaseUrl(inputUrl);
+
+            if (url !== rawUrlForTokenLookup) {
+                vscode.window.setStatusBarMessage(`已自动规范化 URL: ${url}`, 3000);
+                await migrateTokenKeyIfNeeded(rawUrlForTokenLookup, url);
+            }
         }
 
-        // 规范化 URL
-        if (url.endsWith('/')) {
-            url = url.slice(0, -1);
-        }
+        url = normalizeHubBaseUrl(url);
         Logger.log(`[Connect] Final url to connect: ${url}`);
 
         // 6. 保存配置
         await ConfigManager.setServerUrl(url);
 
         // 7. 获取 Token
-        let token = await secretStorageManager.getToken(url);
+        if (rawUrlForTokenLookup && rawUrlForTokenLookup !== url) {
+            await migrateTokenKeyIfNeeded(rawUrlForTokenLookup, url);
+        }
+        let token = await getTokenForHub(url);
 
         Logger.log(`[Connect] Token lookup for ${url}: ${token ? 'FOUND' : 'NOT FOUND'}`);
 
         if (!token) {
+            const tokenPageUrl = buildHubTokenPageUrl(url);
             token = await vscode.window.showInputBox({
-                prompt: `输入 ${url} 的 API Token`,
+                prompt: `输入 ${url} 的 API Token（获取方式：访问 ${tokenPageUrl} 新建 Token）`,
+                placeHolder: '粘贴 Token',
                 password: true,
                 validateInput: (value) => value ? null : 'Token 不能为空'
             });
@@ -380,7 +543,7 @@ async function connectServer(arg?: any) {
             if (!token) return;
 
             // 保存 Token
-            await secretStorageManager.saveToken(token, url);
+            await saveTokenForHub(url, token);
         }
 
         // 8. 建立连接 (包含重试逻辑)
@@ -506,7 +669,7 @@ async function connectServer(arg?: any) {
                             Logger.log(`[Connect] 403 Forbidden detected for ${url}. Token might be invalid.`);
 
                         // 移除无效 Token
-                        await secretStorageManager.deleteToken(url);
+                        await deleteTokenForHub(url);
 
                         // 询问用户是否重新输入
                         const result = await vscode.window.showWarningMessage(
@@ -516,8 +679,10 @@ async function connectServer(arg?: any) {
                         );
 
                         if (result === '输入新 Token') {
+                            const tokenPageUrl = buildHubTokenPageUrl(url!);
                             const newToken = await vscode.window.showInputBox({
-                                prompt: `请重新输入 ${url} 的 API Token`,
+                                prompt: `请重新输入 ${url} 的 API Token（获取方式：访问 ${tokenPageUrl} 新建 Token）`,
+                                placeHolder: '粘贴 Token',
                                 password: true,
                                 validateInput: (value) => value ? null : 'Token 不能为空'
                             });
@@ -525,7 +690,7 @@ async function connectServer(arg?: any) {
                             if (newToken) {
                                 token = newToken;
                                 // 保存新 Token
-                                await secretStorageManager.saveToken(token, url);
+                                await saveTokenForHub(url, token);
                                 retryWithNewToken = true; // 触发重试循环
                                 continue; // 重新开始 do-while
                             }
@@ -591,12 +756,12 @@ async function reconfigureServer() {
     // 如果不删这个，下次输入相同 URL 时又会自动读取旧 Token
     if (currentUrl) {
         // 尝试删除标准格式
-        await secretStorageManager.deleteToken(currentUrl);
+        await deleteTokenForHub(currentUrl);
         // 同时也尝试删除一下去尾部斜杠的，以防万一
         if (currentUrl.endsWith('/')) {
-            await secretStorageManager.deleteToken(currentUrl.slice(0, -1));
+            await deleteTokenForHub(currentUrl.slice(0, -1));
         } else {
-            await secretStorageManager.deleteToken(currentUrl + '/');
+            await deleteTokenForHub(currentUrl + '/');
         }
     }
 
@@ -725,7 +890,7 @@ async function openTerminal(item?: any) {
         // 所以我们应该传入 hub url。但在 connectServer 里我们知道。这里需要保存一下 hubUrl。
         // 简单处理：使用 setServerUrl 保存的那个。
         const hubUrl = ConfigManager.getServerUrl();
-        const token = await secretStorageManager.getToken(hubUrl);
+        const token = hubUrl ? await getTokenForHub(hubUrl) : undefined;
 
         if (!token) {
             vscode.window.showErrorMessage('未找到 Token');

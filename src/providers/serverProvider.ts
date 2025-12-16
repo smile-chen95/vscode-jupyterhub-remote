@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { JupyterHubApi, UserInfo } from '../api/hub';
+import { JupyterHubApi, ServerInfo, UserInfo } from '../api/hub';
 import { ConfigManager } from '../utils/config';
 
 export class ServerTreeItem extends vscode.TreeItem {
@@ -15,6 +15,10 @@ export class ServerTreeItem extends vscode.TreeItem {
         if (contextValue === 'server') {
             this.iconPath = new vscode.ThemeIcon('server');
         } else if (contextValue === 'user') {
+            this.iconPath = new vscode.ThemeIcon('account');
+        } else if (contextValue === 'userManagement') {
+            this.iconPath = new vscode.ThemeIcon('organization');
+        } else if (contextValue === 'hubUser') {
             this.iconPath = new vscode.ThemeIcon('account');
         } else if (contextValue === 'connectedServer') {
             this.iconPath = new vscode.ThemeIcon('remote');
@@ -61,6 +65,22 @@ export class ServerProvider implements vscode.TreeDataProvider<ServerTreeItem> {
         const savedUrl = ConfigManager.getServerUrl();
         const recentServers = ConfigManager.getRecentServers();
 
+        const resolveDefaultServer = (user: UserInfo): ServerInfo | null => {
+            const rawDefaultServer = (user as any).server;
+            const defaultServer =
+                rawDefaultServer && typeof rawDefaultServer === 'object'
+                    ? (rawDefaultServer as ServerInfo)
+                    : null;
+            return defaultServer || user.servers?.[''] || user.servers?.['default'] || null;
+        };
+
+        const formatLastActivity = (iso?: string): string => {
+            if (!iso) return '-';
+            const dt = new Date(iso);
+            if (Number.isNaN(dt.getTime())) return iso;
+            return dt.toLocaleString();
+        };
+
         // Level 2: Children of groups (Recent Servers / Switch Other Servers)
         if (element && element.contextValue === 'group') {
             const items: ServerTreeItem[] = [];
@@ -101,6 +121,43 @@ export class ServerProvider implements vscode.TreeDataProvider<ServerTreeItem> {
             ));
 
             return items;
+        }
+
+        if (element && element.contextValue === 'userManagement') {
+            if (!this.hubApi) return [];
+            try {
+                const users = await this.hubApi.listAllUsers();
+                users.sort((a, b) => {
+                    const at = a.last_activity ? new Date(a.last_activity).getTime() : 0;
+                    const bt = b.last_activity ? new Date(b.last_activity).getTime() : 0;
+                    const aTime = Number.isFinite(at) ? at : 0;
+                    const bTime = Number.isFinite(bt) ? bt : 0;
+                    if (bTime !== aTime) return bTime - aTime;
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+
+                return users.map((u) => {
+                    const server = resolveDefaultServer(u);
+                    const isRunning = !!server;
+                    const lastActivity = formatLastActivity(u.last_activity);
+                    const description = isRunning ? `运行中，${lastActivity}` : `未运行，${lastActivity}`;
+                    return new ServerTreeItem(
+                        u.name,
+                        vscode.TreeItemCollapsibleState.None,
+                        'hubUser',
+                        description
+                    );
+                });
+            } catch (error: any) {
+                return [
+                    new ServerTreeItem(
+                        '无法获取用户列表',
+                        vscode.TreeItemCollapsibleState.None,
+                        'status',
+                        error?.message ? String(error.message) : ''
+                    )
+                ];
+            }
         }
 
         // Level 1: Root items
@@ -179,6 +236,15 @@ export class ServerProvider implements vscode.TreeDataProvider<ServerTreeItem> {
                     'user',
                     this.userInfo.admin ? '管理员' : '用户'
                 ));
+
+                if (this.userInfo.admin) {
+                    items.push(new ServerTreeItem(
+                        '用户管理',
+                        vscode.TreeItemCollapsibleState.Collapsed,
+                        'userManagement',
+                        '点击展开'
+                    ));
+                }
             }
 
             // 3. 切换其他服务器（可展开：历史记录 + 连接新的服务器）

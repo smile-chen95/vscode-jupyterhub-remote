@@ -90,6 +90,33 @@ export class JupyterHubApi {
     }
 
     /**
+     * 列出用户（管理员权限）
+     */
+    async listUsers(offset: number = 0, limit: number = 200): Promise<UserInfo[]> {
+        const response = await this.client.get<UserInfo[]>('/hub/api/users', {
+            params: { offset, limit }
+        });
+        return response.data;
+    }
+
+    async listAllUsers(): Promise<UserInfo[]> {
+        const limit = 200;
+        let offset = 0;
+        const users: UserInfo[] = [];
+
+        while (true) {
+            const batch = await this.listUsers(offset, limit);
+            users.push(...batch);
+            if (batch.length < limit) {
+                break;
+            }
+            offset += limit;
+        }
+
+        return users;
+    }
+
+    /**
      * 启动用户服务器
      */
     async startServer(

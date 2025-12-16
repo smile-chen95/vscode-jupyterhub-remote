@@ -52,13 +52,17 @@ code --install-extension jupyterhub-remote-extension-*.vsix
    - Windows/Linux：`Ctrl+Shift+P`
 2. 运行 `JupyterHub: 连接到 JupyterHub 服务器`
 3. 输入 Hub URL 与 API Token（Token 存在 VS Code Secret Storage）
-4. 若服务器未运行且启用自动启动，会按配置透传 options 启动
+   - 可直接粘贴包含路径的地址（如 `https://host/user/<name>/lab`），扩展会自动规范化为 Hub Base URL（如 `https://host` 或 `https://host/<prefix>`）
+   - Token 获取：访问 `https://<host>/hub/token` 新建 Token
+![](resources/token.png)
+1. 若服务器未运行且启用自动启动，会按配置透传 options 启动
 
 ### 常用命令
 
 - `JupyterHub: 连接到 JupyterHub 服务器`：新增/切换到某个 Hub
 - `JupyterHub: 断开服务器连接`：断开当前连接
 - `JupyterHub: 重新配置服务器`：修改当前 Hub 的 URL/Token 等
+- `JupyterHub: 删除服务器`：从最近列表移除，并清理该服务器的 Token/profile/user_options
 - `JupyterHub: 显示内核管理面板`：查看/停止/重启/中断内核
 - 点击底部状态栏的资源监控项，可打开详情（CPU/内存/磁盘）
 
@@ -100,6 +104,8 @@ JupyterHub 不提供 profiles JSON API，本扩展通过设置让用户指定并
 | `jupyterhub.userOptionsByServer` | Hub URL → user_options | `{}` |
 | `jupyterhub.refreshInterval.*` | 各视图刷新间隔（秒） | 见设置 |
 | `jupyterhub.debug` | 输出调试日志 | `false` |
+| `jupyterhub.allowInsecureTokenStorage` | 允许将 Token 明文写入 Settings JSON（不安全，不建议） | `false` |
+| `jupyterhub.tokenByServer` | Hub URL → Token（仅在开启 allowInsecureTokenStorage 生效） | `{}` |
 
 ## 开发
 
@@ -108,9 +114,6 @@ npm install
 npm run watch   # tsc watch
 npm run lint
 ```
-
-按 `F5` 启动 Extension Development Host。
-
 
 ## License
 

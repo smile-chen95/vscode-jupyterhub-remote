@@ -4,7 +4,7 @@
     "description": "连接远程 JupyterHub 服务，提供文件浏览、终端和内核管理功能",
     "publisher": "smile-chen95",
     "icon": "resources/jupyter-logo.png",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "license": "Apache-2.0",
     "homepage": "https://github.com/smile-chen95/vscode-jupyterhub-remote#readme",
     "bugs": {
@@ -29,6 +29,7 @@
         "onCommand:jupyterhub.connectServer",
         "onCommand:jupyterhub.disconnectServer",
         "onCommand:jupyterhub.reconfigureServer",
+        "onCommand:jupyterhub.deleteServer",
         "onCommand:jupyterhub.refreshFiles",
         "onCommand:jupyterhub.createFile",
         "onCommand:jupyterhub.createFolder",
@@ -69,6 +70,12 @@
                 "title": "JupyterHub: 重新配置服务器",
                 "category": "JupyterHub",
                 "icon": "$(edit)"
+            },
+            {
+                "command": "jupyterhub.deleteServer",
+                "title": "JupyterHub: 删除服务器",
+                "category": "JupyterHub",
+                "icon": "$(trash)"
             },
             {
                 "command": "jupyterhub.refreshFiles",
@@ -266,6 +273,11 @@
                     "group": "inline"
                 },
                 {
+                    "command": "jupyterhub.deleteServer",
+                    "when": "view == jupyterhubServers && (viewItem == disconnected || viewItem == switchServer)",
+                    "group": "inline"
+                },
+                {
                     "command": "jupyterhub.openTerminal",
                     "when": "view == jupyterhubServers && viewItem == connectedServer",
                     "group": "inline"
@@ -277,6 +289,11 @@
                 },
                 {
                     "command": "jupyterhub.disconnectServer",
+                    "when": "view == jupyterhubServers && viewItem == connectedServer",
+                    "group": "inline"
+                },
+                {
+                    "command": "jupyterhub.deleteServer",
                     "when": "view == jupyterhubServers && viewItem == connectedServer",
                     "group": "inline"
                 },
@@ -379,6 +396,19 @@
                     "default": [],
                     "description": "最近连接的服务器列表",
                     "items": {
+                        "type": "string"
+                    }
+                },
+                "jupyterhub.allowInsecureTokenStorage": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "是否允许将 Token 明文存储在 Settings JSON（不安全，不建议开启；默认使用 VS Code SecretStorage）。"
+                },
+                "jupyterhub.tokenByServer": {
+                    "type": "object",
+                    "default": {},
+                    "description": "按服务器 URL 保存 Token（不安全：明文保存在 Settings JSON）。仅在开启 jupyterhub.allowInsecureTokenStorage 时生效。",
+                    "additionalProperties": {
                         "type": "string"
                     }
                 },

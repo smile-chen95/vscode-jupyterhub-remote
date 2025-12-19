@@ -18,7 +18,7 @@ import { ConfigManager } from './utils/config';
 import { Logger } from './utils/logger';
 import { SecretStorageManager } from './utils/secretStorage';
 import { MetricsManager } from './managers/metricsManager';
-import { buildHubTokenPageUrl, normalizeHubBaseUrl } from './utils/url';
+import { buildHubTokenPageUrl, getHubStoragePathParts, normalizeHubBaseUrl } from './utils/url';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -38,6 +38,7 @@ let serverProvider: ServerProvider;
 let fileSystemProvider: JupyterHubFileSystemProvider;
 let kernelControllerManager: KernelControllerManager;
 let fileTreeView: vscode.TreeView<any> | null = null;
+let extensionContext: vscode.ExtensionContext | null = null;
 
 // Managers
 let secretStorageManager: SecretStorageManager;
@@ -127,6 +128,7 @@ export function activate(context: vscode.ExtensionContext) {
     Logger.log('JupyterHub Remote 插件已激活');
 
     try {
+        extensionContext = context;
         // 初始化 Secret Storage
         secretStorageManager = new SecretStorageManager(context.secrets);
 
@@ -831,12 +833,20 @@ async function openFile(item: any) {
         }, async () => {
             const model = await contentsApi!.getFile(filePath);
 
-            const tempDir = path.join(os.tmpdir(), 'vscode-jupyterhub-edit');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
+            const storageRoot = extensionContext?.globalStorageUri?.fsPath;
+            const hubUrl = ConfigManager.getServerUrl() || 'unknown-hub';
+            const hubKeyParts = getHubStoragePathParts(hubUrl);
+            const userKey = encodeURIComponent(currentUser || 'unknown-user');
 
-            const localPath = path.join(tempDir, fileName);
+            const baseDir = storageRoot
+                ? path.join(storageRoot, 'workspace', ...hubKeyParts, userKey)
+                : path.join(os.tmpdir(), 'vscode-jupyterhub-edit', ...hubKeyParts, userKey);
+
+            const localPath = path.join(baseDir, ...filePath.split('/'));
+            const localDir = path.dirname(localPath);
+            if (!fs.existsSync(localDir)) {
+                fs.mkdirSync(localDir, { recursive: true });
+            }
 
             let contentToWrite = model.content;
             if (typeof contentToWrite !== 'string') {

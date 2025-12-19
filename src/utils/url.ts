@@ -65,3 +65,27 @@ export function buildHubTokenPageUrl(hubBaseUrl: string): string {
     return `${base}/hub/token`;
 }
 
+function sanitizePathSegment(segment: string): string {
+    // Avoid invalid path chars across platforms.
+    return segment
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/[. ]+$/g, '');
+}
+
+export function getHubStoragePathParts(hubBaseUrl: string): string[] {
+    const normalized = normalizeHubBaseUrl(hubBaseUrl);
+    try {
+        const parsed = new URL(normalized);
+        const host = sanitizePathSegment(parsed.host.replace(/:/g, '_'));
+        const prefixParts = parsed.pathname
+            .split('/')
+            .filter(Boolean)
+            .map(sanitizePathSegment)
+            .filter(Boolean);
+        return [host, ...prefixParts];
+    } catch {
+        return [sanitizePathSegment(normalized.replace(/^https?:\/\//, ''))].filter(Boolean);
+    }
+}

@@ -29,6 +29,7 @@ export class HttpClient {
                 'Authorization': `token ${this.config.token}`,
                 'Content-Type': 'application/json'
             },
+            proxy: this.resolveAxiosProxyOption(this.config.baseUrl),
             httpsAgent: new https.Agent({
                 rejectUnauthorized: this.config.verifySSL
             }),
@@ -213,15 +214,141 @@ export class HttpClient {
     }
 
     /**
+     * 根据 no_proxy/NO_PROXY 决定是否绕过系统代理。
+     * 命中 no_proxy 时显式设置 proxy=false，避免请求被错误转发到本地代理导致 502。
+     */
+    private resolveAxiosProxyOption(baseUrl: string): false | undefined {
+        const noProxyRaw = process.env.no_proxy || process.env.NO_PROXY;
+        if (!noProxyRaw) {
+            return undefined;
+        }
+
+        let host: string;
+        let port: string;
+        try {
+            const parsed = new URL(baseUrl);
+            host = parsed.hostname.toLowerCase();
+            port = parsed.port;
+        } catch {
+            return undefined;
+        }
+
+        const entries = noProxyRaw
+            .split(',')
+            .map(item => item.trim().toLowerCase())
+            .filter(Boolean);
+
+        const matched = entries.some(entry => this.matchesNoProxyEntry(host, port, entry));
+        if (matched) {
+            Logger.warn(`[Proxy] Bypass proxy for ${host} (matched no_proxy)`);
+            return false;
+        }
+
+        return undefined;
+    }
+
+    private matchesNoProxyEntry(host: string, port: string, entry: string): boolean {
+        if (entry === '*') {
+            return true;
+        }
+
+        const [entryHostRaw, entryPort = ''] = entry.split(':');
+        const entryHost = entryHostRaw.replace(/^\./, '');
+        if (!entryHost) {
+            return false;
+        }
+
+        // host 或子域名匹配
+        const hostMatched = host === entryHost || host.endsWith(`.${entryHost}`);
+        if (!hostMatched) {
+            return false;
+        }
+
+        // no_proxy 指定端口时，需同时匹配端口
+        if (entryPort) {
+            const actualPort = port || '443';
+            return actualPort === entryPort;
+        }
+
+        return true;
+    }
+
+    /**
+     * 从错误对象中提取请求上下文
+     */
+    private extractRequestContext(error: any): { method: string; url: string } {
+        const method = (error?.config?.method || 'GET').toUpperCase();
+        const baseUrl = error?.config?.baseURL || this.config.baseUrl || '';
+        const requestUrl = error?.config?.url || '';
+
+        let resolvedUrl = requestUrl || baseUrl || 'unknown-url';
+        if (requestUrl && baseUrl) {
+            try {
+                resolvedUrl = new URL(requestUrl, baseUrl).toString();
+            } catch {
+                resolvedUrl = `${baseUrl}${requestUrl}`;
+            }
+        }
+
+        return { method, url: resolvedUrl };
+    }
+
+    /**
+     * 压缩错误响应，避免提示过长
+     */
+    private summarizeErrorResponse(data: any): string {
+        if (!data) {
+            return '';
+        }
+
+        if (typeof data === 'string') {
+            return data.trim().slice(0, 240);
+        }
+
+        if (typeof data === 'object') {
+            const candidates = [data.message, data.detail, data.error, data.reason];
+            const firstText = candidates.find(value => typeof value === 'string' && value.trim().length > 0);
+            if (firstText) {
+                return (firstText as string).trim().slice(0, 240);
+            }
+            try {
+                return JSON.stringify(data).slice(0, 240);
+            } catch {
+                return String(data).slice(0, 240);
+            }
+        }
+
+        return String(data).slice(0, 240);
+    }
+
+    /**
      * 错误处理
      */
     private handleError(error: any): Promise<never> {
+        const request = this.extractRequestContext(error);
         if (error.response) {
             // 服务器返回了错误响应
-            const message = error.response.data?.message || error.response.statusText;
+            const status = error.response.status;
+            const statusText = error.response.statusText || 'Unknown Error';
+            const message = this.summarizeErrorResponse(error.response.data);
+            const requestId = error.response.headers?.['x-request-id']
+                || error.response.headers?.['x-b3-traceid']
+                || error.response.headers?.['x-amzn-trace-id'];
+
+            const detailParts = [
+                `API 错误: ${status} ${statusText}`,
+                `请求: ${request.method} ${request.url}`
+            ];
+            if (message) {
+                detailParts.push(`响应: ${message}`);
+            }
+            if (requestId) {
+                detailParts.push(`request-id: ${requestId}`);
+            }
+
             throw new ApiError(
-                `API 错误: ${message}`,
-                error.response.status,
+                detailParts.join(' | '),
+                status,
                 error.response.data,
                 error
             );
@@ -232,10 +359,11 @@ export class HttpClient {
             const detailParts = [code, msg].filter(Boolean);
             const details = detailParts.length > 0 ? ` (${detailParts.join(': ')})` : '';
             Logger.error('[API Network Error Details]:', { code, message: msg });
-            throw new ApiError(`网络错误：无法连接到服务器${details}`, undefined, undefined, error);
+            throw new ApiError(`网络错误：无法连接到服务器${details} | 请求: ${request.method} ${request.url}`, undefined, undefined, error);
         } else {
             // 其他错误
-            throw new ApiError(`请求错误: ${error.message}`, undefined, undefined, error);
+            const msg = error?.message || 'Unknown Error';
+            throw new ApiError(`请求错误: ${msg} | 请求: ${request.method} ${request.url}`, undefined, undefined, error);
         }
     }
 }

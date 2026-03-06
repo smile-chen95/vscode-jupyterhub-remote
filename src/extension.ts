@@ -710,7 +710,11 @@ async function connectServer(arg?: any) {
 
     } catch (error: any) {
         Logger.error(error);
-        vscode.window.showErrorMessage(`连接失败: ${error.message}`);
+        const detail = error?.message ?? String(error);
+        const action = await vscode.window.showErrorMessage(`连接失败: ${detail}`, '查看日志');
+        if (action === '查看日志') {
+            Logger.show();
+        }
         await disconnectServer();
     }
 }

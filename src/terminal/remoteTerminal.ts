@@ -11,6 +11,8 @@ export class RemoteTerminal implements vscode.Pseudoterminal {
     private closeEmitter = new vscode.EventEmitter<number | void>();
     private ws?: WebSocket;
     private dimensions?: vscode.TerminalDimensions;
+    private heartbeatTimer?: NodeJS.Timeout;
+    private static readonly heartbeatIntervalMs = 25000;
 
     onDidWrite: vscode.Event<string> = this.writeEmitter.event;
     onDidClose?: vscode.Event<number | void> = this.closeEmitter.event;
@@ -27,6 +29,7 @@ export class RemoteTerminal implements vscode.Pseudoterminal {
     }
 
     close(): void {
+        this.stopHeartbeat();
         if (this.ws) {
             this.ws.close();
         }
@@ -64,7 +67,8 @@ export class RemoteTerminal implements vscode.Pseudoterminal {
             });
 
             this.ws.on('open', () => {
-                this.writeEmitter.fire('\r\n*** 已连接到远程终端 ***\r\n\r\n');
+                this.writeEmitter.fire(`\r\n*** 已连接到远程终端 (${this.terminalName}) ***\r\n\r\n`);
+                this.startHeartbeat();
 
                 // 如果有初始尺寸，发送给服务器
                 if (this.dimensions) {
@@ -83,7 +87,8 @@ export class RemoteTerminal implements vscode.Pseudoterminal {
                         if (type === 'stdout') {
                             this.writeEmitter.fire(content);
                         } else if (type === 'disconnect') {
-                            this.writeEmitter.fire('\r\n*** 终端已断开连接 ***\r\n');
+                            this.stopHeartbeat();
+                            this.writeEmitter.fire('\r\n*** 终端已断开连接（服务端通知）***\r\n');
                             this.closeEmitter.fire(0);
                         }
                     }
@@ -96,14 +101,40 @@ export class RemoteTerminal implements vscode.Pseudoterminal {
                 this.writeEmitter.fire(`\r\n*** 终端错误: ${error.message} ***\r\n`);
             });
 
-            this.ws.on('close', () => {
-                this.writeEmitter.fire('\r\n*** 终端连接已关闭 ***\r\n');
+            this.ws.on('close', (code, reasonBuffer) => {
+                this.stopHeartbeat();
+                const reason = reasonBuffer.toString() || '无';
+                this.writeEmitter.fire(`\r\n*** 终端连接已关闭（code=${code}, reason=${reason}）***\r\n`);
                 this.closeEmitter.fire(0);
             });
 
         } catch (error: any) {
+            this.stopHeartbeat();
             this.writeEmitter.fire(`\r\n*** 无法连接到终端: ${error.message} ***\r\n`);
             this.closeEmitter.fire(1);
+        }
+    }
+
+    private startHeartbeat(): void {
+        this.stopHeartbeat();
+        this.heartbeatTimer = setInterval(() => {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+
+            try {
+                // 发送 WebSocket ping，避免中间代理按空闲连接超时回收。
+                this.ws.ping();
+            } catch (error: any) {
+                this.writeEmitter.fire(`\r\n*** 心跳发送失败: ${error.message} ***\r\n`);
+            }
+        }, RemoteTerminal.heartbeatIntervalMs);
+    }
+
+    private stopHeartbeat(): void {
+        if (this.heartbeatTimer) {
+            clearInterval(this.heartbeatTimer);
+            this.heartbeatTimer = undefined;
         }
     }
 }
